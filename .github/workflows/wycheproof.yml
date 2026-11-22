@@ -1,0 +1,74 @@
+
+name: Wycheproof CI
+
+on:
+  push:
+    branches-ignore:
+      - main
+    paths:
+      - ".github/workflows/wycheproof.yml"
+      - "tests/test_wycheproof_vectors.py"
+      - "tests/helpers.py"
+      - "src/**"
+      - "CMakeLists.txt"
+      - ".github/workflows/requirements.txt"
+
+  pull_request:
+    paths:
+      - ".github/workflows/wycheproof.yml"
+      - "tests/test_wycheproof_vectors.py"
+      - "tests/helpers.py"
+      - "src/**"
+      - "CMakeLists.txt"
+      - ".github/workflows/requirements.txt"
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wycheproof-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  wycheproof-tests:
+    name: Build and test Wycheproof vectors
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    container:
+      image: openquantumsafe/ci-ubuntu-latest:latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+
+      - name: Configure liboqs
+        run: cmake -S . -B build -G Ninja -DOQS_ALGS_ENABLED=STD
+
+      
+      - name: Build liboqs
+        run: cmake --build build --parallel 2
+
+      - name: Install Python test dependencies
+        run: python3 -m pip install -r .github/workflows/requirements.txt
+
+      - name: Run Wycheproof tests
+        run: |
+          mkdir -p tmp
+          mkdir -p build/test-results
+          python3 -m pytest tests/test_wycheproof_vectors.py \
+            -v \
+            --tb=short \
+            --junitxml=build/test-results/wycheproof.xml
+
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v4
+        with:
+          name: wycheproof-test-results
+          path: build/test-results/wycheproof.xml
+          if-no-files-found: warn
+          retention-days: 7
