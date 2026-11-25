@@ -55,6 +55,8 @@ jobs:
 
       - name: Install Python test dependencies
         run: |
+          apt-get update
+          apt-get install -y python3.14-venv
           python3 -m venv .venv
           .venv/bin/python -m pip install -r .github/workflows/requirements.txt
 
